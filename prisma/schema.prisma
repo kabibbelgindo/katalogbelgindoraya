@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// KATALOG PRODUK PT. BELGINDO RAYA
+// Catatan deploy: skema ini portabel — untuk server kantor
+// (PostgreSQL) cukup ganti provider menjadi "postgresql" dan
+// arahkan DATABASE_URL. Tidak ada tipe data eksklusif SQLite.
+// ============================================================
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         String    @default("ADMIN") // ADMIN | EDITOR | VIEWER (pengembangan berikutnya)
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique // kode produk, mis. 84270
+  name        String
+  brand       String?  // brand/merk per item (fitur logo & brand)
+  logoName    String?  // nama file logo kecil milik item ini (opsional)
+  description String?
+  material    String?
+  note        String? // catatan internal / pemasangan / kemasan
+  status      String   @default("AKTIF") // AKTIF | DRAFT | ARSIP (arsip dinonaktifkan sementara)
+  seriesId    String?
+  typeId      String?
+  categoryId  String?
+  finishId    String?
+  series      Series?      @relation(fields: [seriesId], references: [id])
+  type        ProductType? @relation(fields: [typeId], references: [id])
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  finish      Finish?      @relation(fields: [finishId], references: [id])
+  specs       ProductSpecification[]
+  assets      ProductAsset[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([seriesId])
+  @@index([typeId])
+  @@index([categoryId])
+  @@index([finishId])
+  @@index([name])
+}
+
+// Spesifikasi fleksibel (key-value) agar atribut dapat berkembang
+// tanpa mengubah struktur: panjang, lebar, tinggi, rabbet,
+// kotak penyimpanan, isi per kotak, dll.
+model ProductSpecification {
+  id             String  @id @default(cuid())
+  productId      String
+  product        Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  groupName      String  @default("Umum") // mis. Ukuran, Kemasan, Material
+  attributeName  String
+  attributeValue String
+  unit           String? // mm | in | cm | teks bebas
+  sortOrder      Int     @default(0)
+
+  @@index([productId])
+}
+
+// Aset visual: foto berbagai sudut (maks 8 foto per produk) dan
+// gambar teknis/dokumen pendukung. File asli disimpan di disk,
+// database hanya menyimpan metadata + nama file thumbnail.
+model ProductAsset {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fileName  String
+  thumbName String?
+  mimeType  String
+  fileSize  Int
+  width     Int?
+  height    Int?
+  assetType String   @default("PHOTO") // PHOTO | TECHNICAL
+  caption   String?
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model Series {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  active   Boolean   @default(true)
+  products Product[]
+}
+
+model ProductType {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  active   Boolean   @default(true)
+  products Product[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  active   Boolean   @default(true)
+  products Product[]
+}
+
+model Finish {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  active   Boolean   @default(true)
+  products Product[]
+}
